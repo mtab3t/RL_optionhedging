@@ -1,5 +1,5 @@
 """
-Hedgin option with actor-critic model
+Hedging option with actor-critic AI model
 """
 
 import gym
@@ -7,7 +7,7 @@ import gym_foo2
 import numpy as np
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input
-from keras.layers.merge import Add, Multiply
+from keras.layers.merge import Add, Multiply, concatenate
 from keras.optimizers import Adam
 import keras.backend as K
 
@@ -16,9 +16,7 @@ import tensorflow as tf
 import random
 from collections import deque
 
-"""
-solving pendulum using actor-critic model
-"""
+
 
 # determines how to assign values to each state, i.e. takes the state
 # and action (two-input model) and determines the corresponding value
@@ -79,7 +77,10 @@ class ActorCritic:
         h1 = Dense(24, activation='relu')(state_input)
         h2 = Dense(48, activation='relu')(h1)
         h3 = Dense(24, activation='relu')(h2)
-        output = Dense(self.env.action_space.shape[0], activation='linear')(h3)
+        #output = Dense(self.env.action_space.shape[0], activation='linear')(h3)
+        output1 = Dense(1, activation='sigmoid')(h3)
+        output2 = Dense(1, activation='exp')(h3)
+        output = concatenate([output1, output2])
 
         model = Model(input=state_input, output=output)
         adam = Adam(lr=0.001)
@@ -110,7 +111,7 @@ class ActorCritic:
     def remember(self, cur_state, action, reward, new_state, done):
         self.memory.append([cur_state, action, reward, new_state, done])
 
-    def _train_actor(self, samples):
+    def _train_actor(self, samples, iteration):
         for sample in samples:
             cur_state, action, reward, new_state, _ = sample
             predicted_action = self.actor_model.predict(cur_state)
@@ -124,7 +125,7 @@ class ActorCritic:
                 self.actor_critic_grad: grads
             })
 
-    def _train_critic(self, samples):
+    def _train_critic(self, samples, iteration):
         for sample in samples:
             cur_state, action, reward, new_state, done = sample
             if not done:
@@ -135,15 +136,20 @@ class ActorCritic:
 
             self.critic_model.fit([cur_state, action], reward, verbose=0)
 
-    def train(self):
+    def train(self, iteration):
         batch_size = 32
         if len(self.memory) < batch_size:
             return
 
         rewards = []
         samples = random.sample(self.memory, batch_size)
-        self._train_critic(samples)
-        self._train_actor(samples)
+        self._train_critic(samples, iteration)
+        self._train_actor(samples, iteration)
+        if iteration%2 ==0:
+            self.actor_model.save_weights("actor_model.h5")
+            self.critic_model.save_weights("critic_model.h5")
+            print("Saved model to disk - iteration: ", iteration)
+            #print(self.target_actor_model.weights)
 
     # ========================================================================= #
     #                         Target Model Updating                             #
@@ -211,20 +217,18 @@ def main():
 
             #print("reward", reward)
             actor_critic.remember(cur_state, action, reward, new_state, done)
-            actor_critic.train()
+            actor_critic.train(i)
 
             cur_state = new_state
             env.render()
             price_vector.append(new_state[0][0])
             delta_vector.append(delta[0])
             bs_delta_vector.append(bs_delta)
-            dict ={i: [price_vector, delta_vector, bs_delta_vector]}
+            dict ={'iteration': i, 'price_vector': price_vector, 'delta_vector': delta_vector, 'bs_delta_vector': bs_delta_vector}
 
         simulations.append(dict)
-        #print(simulations)
-
-
-
+    np.save("simulations.npy", simulations)
+    #print(simulations)
 
 
 if __name__ == "__main__":
