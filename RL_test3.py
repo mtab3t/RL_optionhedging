@@ -10,11 +10,14 @@ from keras.layers import Dense, Dropout, Input
 from keras.layers.merge import Add, Multiply, concatenate
 from keras.optimizers import Adam
 import keras.backend as K
+from keras.models import model_from_json
 
 import tensorflow as tf
 
 import random
 from collections import deque
+import time
+
 
 
 
@@ -79,12 +82,16 @@ class ActorCritic:
         h3 = Dense(24, activation='relu')(h2)
         #output = Dense(self.env.action_space.shape[0], activation='linear')(h3)
         output1 = Dense(1, activation='sigmoid')(h3)
-        output2 = Dense(1, activation='exp')(h3)
+        output2 = Dense(1, activation='sigmoid')(h3)
         output = concatenate([output1, output2])
 
         model = Model(input=state_input, output=output)
         adam = Adam(lr=0.001)
         model.compile(loss="mse", optimizer=adam)
+        # serialize model to JSON
+        model_json = model.to_json()
+        with open("actor_model.json", "w") as json_file:
+            json_file.write(model_json)
         return state_input, model
 
     def create_critic_model(self):
@@ -102,6 +109,9 @@ class ActorCritic:
 
         adam = Adam(lr=0.001)
         model.compile(loss="mse", optimizer=adam)
+        model_json = model.to_json()
+        with open("critic_model.json", "w") as json_file:
+            json_file.write(model_json)
         return state_input, action_input, model
 
     # ========================================================================= #
@@ -111,7 +121,7 @@ class ActorCritic:
     def remember(self, cur_state, action, reward, new_state, done):
         self.memory.append([cur_state, action, reward, new_state, done])
 
-    def _train_actor(self, samples, iteration):
+    def _train_actor(self, samples):
         for sample in samples:
             cur_state, action, reward, new_state, _ = sample
             predicted_action = self.actor_model.predict(cur_state)
@@ -125,7 +135,7 @@ class ActorCritic:
                 self.actor_critic_grad: grads
             })
 
-    def _train_critic(self, samples, iteration):
+    def _train_critic(self, samples):
         for sample in samples:
             cur_state, action, reward, new_state, done = sample
             if not done:
@@ -136,20 +146,22 @@ class ActorCritic:
 
             self.critic_model.fit([cur_state, action], reward, verbose=0)
 
-    def train(self, iteration):
-        batch_size = 32
+    def train(self):
+        batch_size = 16
         if len(self.memory) < batch_size:
             return
 
         rewards = []
         samples = random.sample(self.memory, batch_size)
-        self._train_critic(samples, iteration)
-        self._train_actor(samples, iteration)
-        if iteration%2 ==0:
-            self.actor_model.save_weights("actor_model.h5")
-            self.critic_model.save_weights("critic_model.h5")
-            print("Saved model to disk - iteration: ", iteration)
-            #print(self.target_actor_model.weights)
+        self._train_critic(samples)
+        self._train_actor(samples)
+        self.actor_model.save_weights("actor_model.h5")
+        self.critic_model.save_weights("critic_model.h5")
+        # if iteration%2 ==0:
+        #     self.actor_model.save_weights("actor_model.h5")
+        #     self.critic_model.save_weights("critic_model.h5")
+        #     print("Saved model to disk - iteration: ", iteration)
+        #     #print(self.target_actor_model.weights)
 
     # ========================================================================= #
     #                         Target Model Updating                             #
@@ -190,13 +202,15 @@ def main():
     sess = tf.Session()
     K.set_session(sess)
     env = gym.make("foo2-v0")
+
     actor_critic = ActorCritic(env, sess)
 
-    num_trials = 2
+    num_trials = 10000
 
     simulations = []
 
     for i in range(num_trials):
+        start = time.time()
         print("trial number =", i)
         cur_state = env.reset()
         done = False
@@ -212,21 +226,27 @@ def main():
             action = actor_critic.act(cur_state)
             action = action.reshape((1, env.action_space.shape[0]))
 
-            new_state, reward, done, delta, bs_delta,_ = env.step(action)
+            new_state, reward, done, delta, bs_delta, _ = env.step(action)
+            env.render()
             new_state = new_state.reshape((1, env.observation_space.shape[0]))
 
             #print("reward", reward)
             actor_critic.remember(cur_state, action, reward, new_state, done)
-            actor_critic.train(i)
+            actor_critic.train()
 
             cur_state = new_state
-            env.render()
+
             price_vector.append(new_state[0][0])
             delta_vector.append(delta[0])
             bs_delta_vector.append(bs_delta)
-            dict ={'iteration': i, 'price_vector': price_vector, 'delta_vector': delta_vector, 'bs_delta_vector': bs_delta_vector}
 
-        simulations.append(dict)
+        if i%2==0:
+            dict = {'iteration': i, 'price_vector': price_vector, 'delta_vector': delta_vector,
+                    'bs_delta_vector': bs_delta_vector}
+            simulations.append(dict)
+        end = time.time()
+        print("time iteration = ", end - start, "sec")
+
     np.save("simulations.npy", simulations)
     #print(simulations)
 
