@@ -11,15 +11,10 @@ from keras.layers.merge import Add, Multiply, concatenate
 from keras.optimizers import Adam
 import keras.backend as K
 from keras.models import model_from_json
-
 import tensorflow as tf
-
 import random
 from collections import deque
 import time
-
-
-
 
 # determines how to assign values to each state, i.e. takes the state
 # and action (two-input model) and determines the corresponding value
@@ -98,10 +93,8 @@ class ActorCritic:
         state_input = Input(shape=self.env.observation_space.shape)
         state_h1 = Dense(24, activation='relu')(state_input)
         state_h2 = Dense(48)(state_h1)
-
         action_input = Input(shape=self.env.action_space.shape)
         action_h1 = Dense(48)(action_input)
-
         merged = Add()([state_h2, action_h1])
         merged_h1 = Dense(24, activation='relu')(merged)
         output = Dense(1, activation='relu')(merged_h1)
@@ -202,25 +195,21 @@ def main():
     sess = tf.Session()
     K.set_session(sess)
     env = gym.make("foo2-v0")
-
     actor_critic = ActorCritic(env, sess)
-
     num_trials = 10000
-
     simulations = []
+    rewards_vector = []
 
     for i in range(num_trials):
         start = time.time()
         print("trial number =", i)
         cur_state = env.reset()
         done = False
-
         price_vector = []
         delta_vector = []
         bs_delta_vector = []
         cumulative_reward = 0
         bs_cumulative_reward = 0
-
 
         while done == False:
 
@@ -231,8 +220,6 @@ def main():
             new_state, reward, bs_reward, done, delta, bs_delta, _ = env.step(action)
             env.render()
             new_state = new_state.reshape((1, env.observation_space.shape[0]))
-
-            #print("reward", reward)
             actor_critic.remember(cur_state, action, reward, new_state, done)
             actor_critic.train()
 
@@ -241,7 +228,6 @@ def main():
             price_vector.append(new_state[0][0])
             delta_vector.append(delta[0])
             bs_delta_vector.append(bs_delta)
-
             cumulative_reward +=reward
             bs_cumulative_reward += bs_reward
 
@@ -249,6 +235,8 @@ def main():
             dict = {'iteration': i, 'price_vector': price_vector, 'delta_vector': delta_vector,
                     'bs_delta_vector': bs_delta_vector}
             simulations.append(dict)
+            rewards_vector.append([cumulative_reward, bs_cumulative_reward])
+
         end = time.time()
         print("cum_reward = ", cumulative_reward)
         print("bs_cum_reward = ", bs_cumulative_reward)
@@ -256,6 +244,7 @@ def main():
         print("time iteration = ", end - start, "sec")
 
     np.save("simulations.npy", simulations)
+    np.save("rewards_vector.npy", simulations)
     #print(simulations)
 
 
