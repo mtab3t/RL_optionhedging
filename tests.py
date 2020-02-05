@@ -31,23 +31,25 @@ import time
 #
 # np.save("tests.npy", vec)
 
-#vecload = np.load("simulations.npy",  allow_pickle = True).tolist()
-#print(vecload)
+vecload = np.load("simulations.npy",  allow_pickle = True).tolist()
+print(vecload[9])
+
+
 
 # load json and create model
-json_file = open('actor_model.json', 'r')
-loaded_model_json = json_file.read()
-json_file.close()
-loaded_model = model_from_json(loaded_model_json)
-loaded_model.compile(loss="mse", optimizer='adam')
-# load weights into new model
-loaded_model.load_weights("actor_model.h5")
-print("Loaded model from disk")
-
-print('test model')
-
-obs = np.array([[np.log(110/100),10]])
-print(obs)
-y =[]
-output = loaded_model.predict(obs)
-print(output)
+# json_file = open('actor_model.json', 'r')
+# loaded_model_json = json_file.read()
+# json_file.close()
+# loaded_model = model_from_json(loaded_model_json)
+# loaded_model.compile(loss="mse", optimizer='adam')
+# # load weights into new model
+# loaded_model.load_weights("actor_model.h5")
+# print("Loaded model from disk")
+#
+# print('test model')
+#
+# obs = np.array([[np.log(110/100),10]])
+# print(obs)
+# y =[]
+# output = loaded_model.predict(obs)
+# print(output)

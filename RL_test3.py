@@ -81,8 +81,8 @@ class ActorCritic:
         h2 = Dense(48, activation='relu')(h1)
         h3 = Dense(24, activation='relu')(h2)
         #output = Dense(self.env.action_space.shape[0], activation='linear')(h3)
-        output1 = Dense(1, activation='sigmoid')(h3)
-        output2 = Dense(1, activation='sigmoid')(h3)
+        output1 = Dense(1, activation='tanh')(h3)
+        output2 = Dense(1, activation='softplus')(h3)
         output = concatenate([output1, output2])
 
         model = Model(input=state_input, output=output)
@@ -218,6 +218,8 @@ def main():
         price_vector = []
         delta_vector = []
         bs_delta_vector = []
+        cumulative_reward = 0
+        bs_cumulative_reward = 0
 
 
         while done == False:
@@ -226,7 +228,7 @@ def main():
             action = actor_critic.act(cur_state)
             action = action.reshape((1, env.action_space.shape[0]))
 
-            new_state, reward, done, delta, bs_delta, _ = env.step(action)
+            new_state, reward, bs_reward, done, delta, bs_delta, _ = env.step(action)
             env.render()
             new_state = new_state.reshape((1, env.observation_space.shape[0]))
 
@@ -240,11 +242,17 @@ def main():
             delta_vector.append(delta[0])
             bs_delta_vector.append(bs_delta)
 
-        if i%2==0:
+            cumulative_reward +=reward
+            bs_cumulative_reward += bs_reward
+
+        if i%1==0:
             dict = {'iteration': i, 'price_vector': price_vector, 'delta_vector': delta_vector,
                     'bs_delta_vector': bs_delta_vector}
             simulations.append(dict)
         end = time.time()
+        print("cum_reward = ", cumulative_reward)
+        print("bs_cum_reward = ", bs_cumulative_reward)
+        print('__________________________________________________________________________________')
         print("time iteration = ", end - start, "sec")
 
     np.save("simulations.npy", simulations)
