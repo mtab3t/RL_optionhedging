@@ -1,6 +1,7 @@
 import numpy as np
 import gym
 import gym_foo2
+import matplotlib.pyplot as plt
 import numpy as np
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input
@@ -31,9 +32,24 @@ import time
 #
 # np.save("tests.npy", vec)
 
-vecload = np.load("simulations.npy",  allow_pickle = True).tolist()
-print(vecload[9])
+number = 7854
+x = range(0, 90)
 
+vecload = np.load("simulations.npy",  allow_pickle = True).tolist()
+
+print(vecload[number]['price_vector'])
+
+plt.plot(x, vecload[number]['delta_vector'] , label='delta')
+plt.plot(x, vecload[number]['bs_delta_vector'] , label='bs_delta_vector')
+plt.legend()
+plt.show()
+
+print(vecload[number]['cumulative_reward'])
+
+plt.plot(x, vecload[number]['cumulative_reward'] , label='cumulative_reward')
+plt.plot(x, vecload[number]['bs_cumulative_reward'] , label='bs_cumulative_reward')
+plt.legend()
+plt.show()
 
 
 # load json and create model
